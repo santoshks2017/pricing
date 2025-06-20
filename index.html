@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Sheets Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        #chart-container { width: 100%; max-width: 600px; }
+    </style>
+</head>
+<body>
+    <h1>Google Sheets Dashboard</h1>
+    <p>This page fetches data from a public Google Sheet and displays it below.</p>
+    <div id="table-container"></div>
+    <div id="chart-container">
+        <canvas id="chart"></canvas>
+    </div>
+    <script src="./chart.umd.min.js"></script>
+    <script>
+        const sheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+
+        fetch(url)
+            .then(res => res.text())
+            .then(text => {
+                // Google Sheets adds some characters before the JSON
+                const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf(')')));
+                const rows = json.table.rows.map(r => r.c.map(c => c ? c.v : ''));
+                const headers = rows.shift();
+                createTable(headers, rows);
+                drawChart(headers, rows);
+            })
+            .catch(err => console.error('Error fetching sheet', err));
+
+        function createTable(headers, rows) {
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const thr = document.createElement('tr');
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                thr.appendChild(th);
+            });
+            thead.appendChild(thr);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            rows.forEach(r => {
+                const tr = document.createElement('tr');
+                headers.forEach((_, i) => {
+                    const td = document.createElement('td');
+                    td.textContent = r[i] || '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            document.getElementById('table-container').appendChild(table);
+        }
+
+        function drawChart(headers, rows) {
+            const levelIndex = headers.indexOf('Class Level');
+            if (levelIndex === -1) return;
+            const counts = {};
+            rows.forEach(r => {
+                const key = r[levelIndex];
+                if (!key) return;
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            const labels = Object.keys(counts);
+            const data = Object.values(counts);
+            const ctx = document.getElementById('chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Students per Class Level',
+                        data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
