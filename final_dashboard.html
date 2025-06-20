@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Final Tab Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2rem; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f4f4f4; }
+        #chart-container { width: 100%; max-width: 600px; }
+    </style>
+</head>
+<body>
+    <h1>Final Tab Dashboard</h1>
+    <div id="metrics-table"></div>
+    <div id="chart-container">
+        <canvas id="metrics-chart"></canvas>
+    </div>
+    <script src="./chart.umd.min.js"></script>
+    <script>
+        const sheetId = '1U2F7gTaOpAWS91y39oqB6lW08feX5VEsRSL5e9mI_iU';
+        const sheetName = 'final';
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+
+        fetch(url)
+            .then(res => res.text())
+            .then(text => {
+                const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf(')')));
+                const rows = json.table.rows.map(r => r.c.map(c => c ? c.v : null));
+                const metrics = extractMetrics(rows);
+                createTable(metrics);
+                drawChart(metrics);
+            })
+            .catch(err => console.error('Error fetching sheet', err));
+
+        function extractMetrics(rows) {
+            const keys = ['Impressions','Reach','Clicks','Audience gained','Cost','Price'];
+            const metrics = {};
+            rows.forEach(r => {
+                const key = r[1] ? r[1].toString().trim() : null;
+                if (key && keys.includes(key)) {
+                    if(key==='Cost' && metrics['Cost']) return;
+                    metrics[key] = Number(r[2]);
+                }
+            });
+            if(!metrics['Cost'] && metrics['Price']) {
+                metrics['Cost'] = metrics['Price'];
+                delete metrics['Price'];
+            }
+            return metrics;
+        }
+
+        function createTable(metrics) {
+            const table = document.createElement('table');
+            const thead = document.createElement('thead');
+            const thr = document.createElement('tr');
+            ['Metric','Value'].forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h;
+                thr.appendChild(th);
+            });
+            thead.appendChild(thr);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+            Object.entries(metrics).forEach(([k,v]) => {
+                const tr = document.createElement('tr');
+                const td1 = document.createElement('td');
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.textContent = v.toLocaleString();
+                tr.appendChild(td1);
+                tr.appendChild(td2);
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            document.getElementById('metrics-table').appendChild(table);
+        }
+
+        function drawChart(metrics) {
+            const labels = Object.keys(metrics);
+            const data = Object.values(metrics);
+            const ctx = document.getElementById('metrics-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Metrics',
+                        data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
